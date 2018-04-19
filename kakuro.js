@@ -3,23 +3,25 @@
 let canvas = document.getElementById('game_board');
 let ctx = canvas.getContext('2d');
 
+const random_int = (bound) => Math.floor(Math.random() * bound);
+
 const array2d = (width, height, fn) =>
       Array(width).fill().map(
           (_, y) => Array(height).fill().map(
               (_, x) => fn(x, y)));
 
 const for_2d = (board, fn) =>
-      board.forEach((row, y) => row.forEach((_, x) => fn(x, y)));
+      board.forEach((row, y) => row.forEach((cell, x) => fn(x, y, cell)));
 
-const draw_board = (board) => for_2d(board, (x, y) => {
+const draw_board = (board) => for_2d(board, (x, y, cell) => {
     const width = canvas.width / board[0].length;
     const height = canvas.height / board.length;
     const xpos = width * x, ypos = height * y;
-    const cell = board[y][x];
-    switch (cell.kind) {
+    const font_size = height * 0.6;
+    switch (cell.type) {
     case 'num':
         ctx.fillStyle = 'rgb(0, 0, 0)';
-        ctx.font = '48px sans';
+        ctx.font = `${font_size}px sans`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
 
@@ -27,6 +29,7 @@ const draw_board = (board) => for_2d(board, (x, y) => {
         ctx.strokeRect(xpos, ypos, width, height);
 
         // HACK: manual metrics
+        break;
         ctx.fillText(cell.value, xpos+width/2, ypos+height*0.55, width);
         break;
     case 'hint':
@@ -37,56 +40,148 @@ const draw_board = (board) => for_2d(board, (x, y) => {
         ctx.strokeStyle = 'rgb(200, 200, 200)';
         ctx.strokeRect(xpos, ypos, width, height);
 
+        if (!cell.hintv && !cell.hinth)
+            break;
+
         ctx.beginPath();
         ctx.moveTo(xpos, ypos);
         ctx.lineTo(xpos+width, ypos+width);
         ctx.closePath();
         ctx.stroke();
 
-        ctx.font = '24px sans';
+        ctx.font = `${font_size*0.5}px sans`;
         ctx.fillStyle = 'rgb(255, 255, 255)';
         ctx.textAlign = 'center';
         // HACK: manual metrics
-        if (cell.hintl) {
+        if (cell.hintv) {
             ctx.textBaseline = 'hanging';
-            ctx.fillText(cell.hintl, xpos + width*1/4, ypos + height*0.6, width);
+            ctx.fillText(cell.hintv, xpos + width*1/4, ypos + height*0.6, width);
         }
-        if (cell.hintr) {
+        if (cell.hinth) {
             ctx.textBaseline = 'alphabetic';
-            ctx.fillText(cell.hintr, xpos + width*3/4, ypos + height*0.4, width);
+            ctx.fillText(cell.hinth, xpos + width*3/4, ypos + height*0.4, width);
         }
         break;
     default: break;
     }
 });
 
-const calc_hints = (board) => for_2d(board, (x, y) => {
-    if (board[y][x].kind != 'hint')
-        return;
+const for_num_group = (board, x, y, xoff, yoff, fn, len=0) => {
+    x += xoff;
+    y += yoff;
+    const cell = board[y] && board[y][x];
+    if (cell && cell.type == "num") {
+        fn(x, y, cell);
+        return for_num_group(board, x, y, xoff, yoff, fn, ++len);
+    }
+    return [len, x, y];
+};
 
-    const cell_num = (x, y) => board[y] && board[y][x] && board[y][x].value;
+const calc_nums = (board) => {
+    // group numbers together
+    for_2d(board, (x, y, cell) => {
+        if (cell.type != 'hint') return;
+        const group_cells = (xoff, yoff, seen_index) => {
+            const seen = [];
+            for_num_group(board, x, y, xoff, yoff, (x, y, cell) => {
+                cell[seen_index] = seen;
+            });
+        };
+        group_cells(1, 0, "seenh");
+        group_cells(0, 1, "seenv");
+    });
 
-    const search_and_total = (x, y, xoff, yoff) => {
-        const num = cell_num(x+xoff, y+yoff);
-        return num ? num + search_and_total(x+xoff, y+yoff, xoff, yoff) : 0;
+    // calculate number for each cell
+    for_2d(board, (x, y, cell) => {
+        if (cell.type != 'num') return;
+        let value = random_int(9) + 1;
+        const orig_value = value;
+        while (cell.seenh[value] || cell.seenv[value]) {
+            value = (value % 9) + 1; // increment and wrap from 9->1
+            if (value == orig_value) {
+                throw Error('Cannot make board!');
+            }
+        }
+        cell.seenh[value] = true;
+        cell.seenv[value] = true;
+        cell.value = value;
+    });
+
+    // total hints
+    for_2d(board, (x, y, cell) => {
+        if (cell.type != 'hint') return;
+        const total_cells = (xoff, yoff) => {
+            let total = 0;
+            for_num_group(board, x, y, xoff, yoff, (x, y, cell) => {
+                total += cell.value;
+            });
+            return total;
+        };
+        cell.hintv = total_cells(0, 1);
+        cell.hinth = total_cells(1, 0);
+    });
+};
+
+const fix_board = (board) => {
+    let fix_again = true;
+    const fix_dir = (xoff, yoff) => {
+        for_2d(board, (x, y, cell) => {
+            if (cell.type != "hint") return;
+            const [len, ex, ey] = for_num_group(board, x, y, xoff, yoff, () => {});
+            const endcell = board[ey] && board[ey][ex];
+            if (len == 1) {
+                // clear out neighbors
+                fix_again = true;
+                if (!endcell || endcell.border ||
+                    (Math.random() < 0.5 && !cell.border))
+                {
+                    cell.type = 'num';
+                } else {
+                    endcell.type = 'num';
+                }
+            } else if (len > 9) {
+                // fill in row
+                fix_again = true;
+                for_num_group(board, x, y, xoff, yoff, (x, y, cell) => {
+                    if (Math.random() < 0.5)
+                        cell.type = 'hint';
+                });
+            }
+        });
     };
+    while (fix_again) {
+        fix_again = false;
+        fix_dir(0, 1);
+        fix_dir(1, 0);
+    }
+};
 
-    board[y][x].hintl = search_and_total(x, y, 0, 1);
-    board[y][x].hintr = search_and_total(x, y, 1, 0);
-});
-
-const border_board = (w, h) => {
-    let board = array2d(w, h, (x, y) => {
-        if (x == 0 || x == w-1 || y == 0 || y == h-1) {
-            return {kind: 'hint'};
+const random_board = (w, h, gap_chance) => {
+    const board = array2d(w+2, h+2, (x, y) => {
+        if (x == 0 || x == w+1 || y == 0 || y == h+1) {
+            return {type: 'hint', border: true};
         } else {
-            const value = Math.floor(Math.random() * 9.0 + 1.0);
-            return {kind: 'num', value};
+            return {type: 'num'};
         }
     });
-    calc_hints(board);
+    for (let i=0; i<(gap_chance * w * h); ++i) {
+        const [x, y] = [random_int(w)+1, random_int(w)+1];
+        const cell = board[y][x];
+        if (cell.type == 'hint') --i; // try again until enough filled
+        cell.type = 'hint';
+    }
+    fix_board(board);
     return board;
 };
 
-const board = border_board(8, 8);
+const make_board = () => {
+    const board = random_board(18, 18, 0.5);
+    try {
+        calc_nums(board);
+    } catch (err) {
+        return make_board();
+    }
+    return board;
+};
+const board = make_board();
 draw_board(board);
