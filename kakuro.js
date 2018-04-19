@@ -5,7 +5,7 @@ let ctx = canvas.getContext('2d');
 
 const random_int = (bound) => Math.floor(Math.random() * bound);
 
-const array2d = (width, height, fn) =>
+const array_2d = (width, height, fn) =>
       Array(width).fill().map(
           (_, y) => Array(height).fill().map(
               (_, x) => fn(x, y)));
@@ -159,10 +159,10 @@ const fix_board = (board) => {
     // pass 1: count cells, mark not seen, find some number
     let cx, cy;
     let cell_count = 0;
+    const seen = array_2d(board[0].length, board.length, (x, y) => false);
     for_2d(board, (x, y, cell) => {
         if (cell.type == 'num') {
             [cx, cy] = [x, y];
-            cell.seen = false;
             ++cell_count;
         }
     });
@@ -171,8 +171,8 @@ const fix_board = (board) => {
     const flood_fill = (x, y) => {
         const fill_neighbor = (x, y) => {
             const cell = board[y] && board[y][x];
-            if (cell && cell.type == 'num' && !cell.seen) {
-                cell.seen = true;
+            if (cell && cell.type == 'num' && !seen[y][x]) {
+                seen[y][x] = true;
                 ++seen_count;
                 flood_fill(x, y);
             }
@@ -189,7 +189,7 @@ const fix_board = (board) => {
 };
 
 const random_board = (w, h, gap_chance) => {
-    const board = array2d(w+2, h+2, (x, y) => {
+    const board = array_2d(w+2, h+2, (x, y) => {
         if (x == 0 || x == w+1 || y == 0 || y == h+1) {
             return {type: 'hint', border: true};
         } else {
@@ -223,5 +223,5 @@ const make_board = (w, h) => {
     } while (bad_board);
     return board;
 };
-const board = make_board(10, 10);
+const board = make_board(30, 30);
 draw_board(board);
