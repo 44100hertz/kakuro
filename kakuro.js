@@ -99,7 +99,7 @@ const calc_nums = (board) => {
         while (cell.seenh[value] || cell.seenv[value]) {
             value = (value % 9) + 1; // increment and wrap from 9->1
             if (value == orig_value) {
-                throw Error('Cannot make board!');
+                throw Error('number collision');
             }
         }
         cell.seenh[value] = true;
@@ -123,7 +123,7 @@ const calc_nums = (board) => {
 };
 
 const fix_board = (board) => {
-    let fix_again = true;
+    let fix_again;
     const fix_dir = (xoff, yoff) => {
         for_2d(board, (x, y, cell) => {
             if (cell.type != "hint") return;
@@ -149,10 +149,42 @@ const fix_board = (board) => {
             }
         });
     };
-    while (fix_again) {
+    do {
         fix_again = false;
         fix_dir(0, 1);
         fix_dir(1, 0);
+    } while (fix_again)
+
+    // continuity check
+    // pass 1: count cells, mark not seen, find some number
+    let cx, cy;
+    let cell_count = 0;
+    for_2d(board, (x, y, cell) => {
+        if (cell.type == 'num') {
+            [cx, cy] = [x, y];
+            cell.seen = false;
+            ++cell_count;
+        }
+    });
+    // pass 2: flood fill from the number, and count
+    let seen_count = 0;
+    const flood_fill = (x, y) => {
+        const fill_neighbor = (x, y) => {
+            const cell = board[y] && board[y][x];
+            if (cell && cell.type == 'num' && !cell.seen) {
+                cell.seen = true;
+                ++seen_count;
+                flood_fill(x, y);
+            }
+        };
+        fill_neighbor(x-1, y);
+        fill_neighbor(x+1, y);
+        fill_neighbor(x, y-1);
+        fill_neighbor(x, y+1);
+    };
+    flood_fill(cx, cy);
+    if (cell_count > seen_count) {
+        throw Error("non-continuous board");
     }
 };
 
@@ -164,24 +196,32 @@ const random_board = (w, h, gap_chance) => {
             return {type: 'num'};
         }
     });
+    // black out a constant number of spaces
     for (let i=0; i<(gap_chance * w * h); ++i) {
         const [x, y] = [random_int(w)+1, random_int(w)+1];
         const cell = board[y][x];
         if (cell.type == 'hint') --i; // try again until enough filled
         cell.type = 'hint';
     }
-    fix_board(board);
     return board;
 };
 
-const make_board = () => {
-    const board = random_board(18, 18, 0.5);
-    try {
-        calc_nums(board);
-    } catch (err) {
-        return make_board();
-    }
+// make a board persistantly!
+const make_board = (w, h) => {
+    let board;
+    let bad_board;
+    do {
+        bad_board = false;
+        try {
+            board = random_board(w, h, 0.5);
+            fix_board(board);
+            calc_nums(board);
+        } catch (err) {
+            console.log(err.message);
+            bad_board = true;
+        }
+    } while (bad_board);
     return board;
 };
-const board = make_board();
+const board = make_board(10, 10);
 draw_board(board);
