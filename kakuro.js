@@ -75,7 +75,7 @@ const fix_board = (board) => {
     let fix_again;
     const fix_dir = (xoff, yoff) => {
         for2d_type(board, 'hint', (x, y, cell) => {
-            const [len, ex, ey] = for_num_group(board, x, y, xoff, yoff, () => {});
+            const [len, ex, ey] = for_num_group(board, x, y, xoff, yoff, () => 0);
             const endcell = board[ey] && board[ey][ex];
             if (len == 1) {
                 // clear out neighbors
@@ -88,12 +88,9 @@ const fix_board = (board) => {
                     endcell.type = 'num';
                 }
             } else if (len > 9) {
-                // fill in row
-                fix_again = true;
-                for_num_group(board, x, y, xoff, yoff, (x, y, cell) => {
-                    if (Math.random() < 0.5)
-                        cell.type = 'hint';
-                });
+                // fill a random cell between start and end
+                const f = (a, b) => Math.floor(a + (b-a)*Math.random());
+                board[f(y+yoff, ey)][f(x+xoff, ex)].type = 'hint';
             }
         });
     };
