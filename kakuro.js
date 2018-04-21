@@ -37,7 +37,7 @@ const calc_nums = (board) => {
         const group_cells = (xoff, yoff, arr) => {
             const seen = [];
             for_num_group(board, x, y, xoff, yoff, (x, y, cell) => {
-                seen[y][x] = seen;
+                arr[y][x] = seen;
             });
         };
         group_cells(1, 0, seenrow);
