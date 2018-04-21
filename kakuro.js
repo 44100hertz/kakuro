@@ -196,12 +196,23 @@ const random_board = (w, h, gap_chance) => {
             return {type: 'num'};
         }
     });
-    // black out a constant number of spaces
-    for (let i=0; i<(gap_chance * w * h); ++i) {
+
+    const is_hint = (x, y) =>
+          board[y] && board[y][x] && board[y][x].type == 'hint';
+
+    const is_valid = (x, y) =>
+          [[1,0], [0,1], [0,-1], [-1,0]]
+          .every(([xoff, yoff]) =>
+                 is_hint(x+xoff, y+yoff) || !is_hint(x+xoff*2, y+yoff*2));
+
+    for (let i=0; i<(gap_chance * w * h);) {
         const [x, y] = [random_int(w)+1, random_int(w)+1];
         const cell = board[y][x];
-        if (cell.type == 'hint') --i; // try again until enough filled
-        cell.type = 'hint';
+        if (!is_hint(x, y) && is_valid(x, y)) {
+//        if (!is_hint(x, y)) {
+            cell.type = 'hint';
+            ++i;
+        }
     }
     return board;
 };
@@ -213,7 +224,7 @@ const make_board = (w, h) => {
     do {
         bad_board = false;
         try {
-            board = random_board(w, h, 0.5);
+            board = random_board(w, h, 0.2);
             fix_board(board);
             calc_nums(board);
         } catch (err) {
@@ -223,5 +234,5 @@ const make_board = (w, h) => {
     } while (bad_board);
     return board;
 };
-const board = make_board(30, 30);
+const board = make_board(40, 40);
 draw_board(board);
