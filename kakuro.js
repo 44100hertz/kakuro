@@ -4,18 +4,21 @@ let canvas = document.getElementById('game_board');
 let ctx = canvas.getContext('2d');
 
 const random_int = (bound) =>
-          Math.floor(Math.random() * bound);
+      Math.floor(Math.random() * bound);
 
 const array2d = (width, height, fn) =>
-          Array(width).fill().map(
-              (_, y) => Array(height).fill().map(
-                  (_, x) => fn(x, y)));
+      Array(width).fill().map(
+          (_, y) => Array(height).fill().map(
+              (_, x) => fn(x, y)));
 
 const array2d_of_size = (arr, fn) =>
           array2d(arr[0].length, arr.length, fn);
 
 const for2d = (board, fn) =>
-          board.forEach((row, y) => row.forEach((cell, x) => fn(x, y, cell)));
+      board.forEach((row, y) => row.forEach((cell, x) => fn(x, y, cell)));
+
+const for2d_type = (board, type, fn) =>
+      for2d(board, (x, y, cell) => cell.type == type && fn(x, y, cell));
 
 const for_num_group = (board, x, y, xoff, yoff, fn, len=0) => {
     x += xoff;
@@ -32,21 +35,15 @@ const calc_nums = (board) => {
     const seenrow = array2d_of_size(board, () => false);
     const seencol = array2d_of_size(board, () => false);
     // group numbers together
-    for2d(board, (x, y, cell) => {
-        if (cell.type != 'hint') return;
-        const group_cells = (xoff, yoff, arr) => {
-            const seen = [];
-            for_num_group(board, x, y, xoff, yoff, (x, y, cell) => {
-                arr[y][x] = seen;
-            });
-        };
-        group_cells(1, 0, seenrow);
-        group_cells(0, 1, seencol);
+    for2d_type(board, 'hint', (x, y, cell) => {
+        const group_cells = (xoff, yoff, arr, seen) =>
+              for_num_group(board, x, y, xoff, yoff, (x, y, cell) =>
+                            arr[y][x] = seen);
+        group_cells(1, 0, seenrow, []);
+        group_cells(0, 1, seencol, []);
     });
-
     // calculate number for each cell
-    for2d(board, (x, y, cell) => {
-        if (cell.type != 'num') return;
+    for2d_type(board, 'num', (x, y, cell) => {
         let value = random_int(9) + 1;
         const orig_value = value;
         const [row, col] = [seenrow[y][x], seencol[y][x]];
@@ -61,8 +58,7 @@ const calc_nums = (board) => {
     });
 
     // total hints
-    for2d(board, (x, y, cell) => {
-        if (cell.type != 'hint') return;
+    for2d_type(board, 'hint', (x, y, cell) => {
         const total_cells = (xoff, yoff) => {
             let total = 0;
             for_num_group(board, x, y, xoff, yoff, (x, y, cell) => {
@@ -78,8 +74,7 @@ const calc_nums = (board) => {
 const fix_board = (board) => {
     let fix_again;
     const fix_dir = (xoff, yoff) => {
-        for2d(board, (x, y, cell) => {
-            if (cell.type != "hint") return;
+        for2d_type(board, 'hint', (x, y, cell) => {
             const [len, ex, ey] = for_num_group(board, x, y, xoff, yoff, () => {});
             const endcell = board[ey] && board[ey][ex];
             if (len == 1) {
@@ -113,12 +108,8 @@ const fix_board = (board) => {
     let cx, cy;
     let cell_count = 0;
     const seen = array2d_of_size(board, () => false);
-    for2d(board, (x, y, cell) => {
-        if (cell.type == 'num') {
-            [cx, cy] = [x, y];
-            ++cell_count;
-        }
-    });
+    for2d_type(board, 'num', (x, y, cell) =>
+               [cx, cy, cell_count] = [x, y, cell_count+1]);
     // pass 2: flood fill from the number, and count
     let seen_count = 0;
     const flood_fill = (x, y) => {
