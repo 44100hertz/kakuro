@@ -11,8 +11,8 @@ const array2d = (width, height, fn) =>
           (_, y) => Array(height).fill().map(
               (_, x) => fn(x, y)));
 
-const array2d_of_size = (arr, fn) =>
-          array2d(arr[0].length, arr.length, fn);
+const map2d = (arr, fn) =>
+      arr.map((row, x) => row.map((cell, y) => fn(x, y, cell)));
 
 const for2d = (board, fn) =>
       board.forEach((row, y) => row.forEach((cell, x) => fn(x, y, cell)));
@@ -32,8 +32,8 @@ const for_num_group = (board, x, y, xoff, yoff, fn, len=0) => {
 };
 
 const calc_nums = (board) => {
-    const seenrow = array2d_of_size(board, () => false);
-    const seencol = array2d_of_size(board, () => false);
+    const seenrow = map2d(board, () => false);
+    const seencol = map2d(board, () => false);
     // group numbers together
     for2d_type(board, 'hint', (x, y, cell) => {
         const group_cells = (xoff, yoff, arr, seen) =>
@@ -104,7 +104,7 @@ const fix_board = (board) => {
     // pass 1: count cells, mark not seen, find some number
     let cx, cy;
     let cell_count = 0;
-    const seen = array2d_of_size(board, () => false);
+    const seen = map2d(board, () => false);
     for2d_type(board, 'num', (x, y, cell) =>
                [cx, cy, cell_count] = [x, y, cell_count+1]);
     // pass 2: flood fill from the number, and count
@@ -165,7 +165,7 @@ const make_board = (w, h) => {
     do {
         bad_board = false;
         try {
-            board = random_board(w, h, 0.2);
+            board = random_board(w, h, 0.3);
             fix_board(board);
             calc_nums(board);
         } catch (err) {
