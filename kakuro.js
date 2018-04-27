@@ -129,7 +129,7 @@ const fix_board = (board) => {
     }
 };
 
-const random_board = (w, h, gap_chance) => {
+const random_board = (w, h, density) => {
     const board = array2d(w+2, h+2, (x, y) => {
         if (x == 0 || x == w+1 || y == 0 || y == h+1) {
             return {type: 'hint', border: true};
@@ -146,7 +146,7 @@ const random_board = (w, h, gap_chance) => {
           .every(([xoff, yoff]) =>
                  is_hint(x+xoff, y+yoff) || !is_hint(x+xoff*2, y+yoff*2));
 
-    for (let i=0; i<(gap_chance * w * h);) {
+    for (let i=0; i<(density * w * h);) {
         const [x, y] = [random_int(w)+1, random_int(w)+1];
         const cell = board[y][x];
         if (!is_hint(x, y) && is_valid(x, y)) {
@@ -159,13 +159,13 @@ const random_board = (w, h, gap_chance) => {
 };
 
 // make a board persistantly!
-const make_board = (w, h) => {
+const make_board = (w, h, density) => {
     let board;
     let bad_board;
     do {
         bad_board = false;
         try {
-            board = random_board(w, h, 0.3);
+            board = random_board(w, h, density);
             fix_board(board);
             calc_nums(board);
         } catch (err) {
@@ -229,5 +229,5 @@ const draw_board = (board) => for2d(board, (x, y, cell) => {
     }
 });
 
-const board = make_board(30, 30);
+const board = make_board(20, 20, 0.3);
 draw_board(board);
